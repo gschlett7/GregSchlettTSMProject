@@ -1,0 +1,107 @@
+---
+title: "UFC Fight History - ARINMA"
+author: "Gregory Schlett"
+date: "2025-04-04"
+output: html_document
+--- 
+
+# UFC Fight History
+## Data from: Kaggle
+### Updated by: Alex Magnus
+####### End
+
+```{r}
+getwd()
+```
+
+```{r}
+# Uploading CSV file from working directory
+ufc_data <- read.csv("UFC Fight Statistics (July 2016 - Nov 2024).csv")
+# ufc_data <- read.csv("/Users/mreknoian/Desktop/UFC Fight Statistics (July 2016 - Nov 2024).csv")
+
+# View of the first few rows of Fight Statistics
+head(ufc_data)
+```
+
+```{r}
+str(ufc_data)
+```
+
+```{r}
+ufc_data$TotalStrikes.F1 <- ufc_data$Total.Strike.Landed.F1R1 + ufc_data$Total.Strike.Landed.F1R2 + ufc_data$Total.Strike.Landed.F1R3 + ufc_data$Total.Strike.Landed.F1R4 + ufc_data$Total.Strike.Landed.F1R5
+
+ufc_data$TotalStrikes.F2 <- ufc_data$Total.Strike.Landed.F2R1 + ufc_data$Total.Strike.Landed.F2R2 + ufc_data$Total.Strike.Landed.F2R3 + ufc_data$Total.Strike.Landed.F2R4 + ufc_data$Total.Strike.Landed.F2R5
+
+ufc_data$TotalSigStrikes.F1 <- ufc_data$Sig..Strike.Landed.F1R1 + ufc_data$Sig..Strike.Landed.F1R2 + ufc_data$Sig..Strike.Landed.F1R3 + ufc_data$Sig..Strike.Landed.F1R4 + ufc_data$Sig..Strike.Landed.F1R5
+ufc_data$TotalSigStrikes.F2 <- ufc_data$Sig..Strike.Landed.F2R1 + ufc_data$Sig..Strike.Landed.F2R2 + ufc_data$Sig..Strike.Landed.F2R3 + ufc_data$Sig..Strike.Landed.F2R4 + ufc_data$Sig..Strike.Landed.F2R5
+
+ufc_data$TotalKnockdowns.F1 <- ufc_data$Knockdowns.F1R1 + ufc_data$Knockdowns.F1R2 + ufc_data$Knockdowns.F1R3 + ufc_data$Knockdowns.F1R4 + ufc_data$Knockdowns.F1R5
+
+ufc_data$TotalKnockdowns.F2 <- ufc_data$Knockdowns.F2R1 + ufc_data$Knockdowns.F2R2 + ufc_data$Knockdowns.F2R3 + ufc_data$Knockdowns.F2R4 + ufc_data$Knockdowns.F2R5
+
+ufc_data$TotalTakedowns.F1 <- ufc_data$TD.Completed.F1R1 + ufc_data$TD.Completed.F1R2 + ufc_data$TD.Completed.F1R3 + ufc_data$TD.Completed.F1R4 + ufc_data$TD.Completed.F1R5
+
+ufc_data$TotalTakedowns.F2 <- ufc_data$TD.Completed.F2R1 + ufc_data$TD.Completed.F2R2 + ufc_data$TD.Completed.F2R3 + ufc_data$TD.Completed.F2R4 + ufc_data$TD.Completed.F2R5
+
+ufc_data$TotalControlTime.F1 <- ufc_data$Ctrl.Time..Minutes..F1R1 + ufc_data$Ctrl.Time..Minutes..F1R2 + ufc_data$Ctrl.Time..Minutes..F1R3 + ufc_data$Ctrl.Time..Minutes..F1R4 + ufc_data$Ctrl.Time..Minutes..F1R5
+
+ufc_data$TotalControlTime.F2 <- ufc_data$Ctrl.Time..Minutes..F2R1 + ufc_data$Ctrl.Time..Minutes..F2R2 + ufc_data$Ctrl.Time..Minutes..F2R3 + ufc_data$Ctrl.Time..Minutes..F2R4 + ufc_data$Ctrl.Time..Minutes..F2R5
+```
+
+```{r}
+#install.packages("forecast")
+#install.packages("tseries")  # for testing stationarity
+library(forecast)
+library(tseries)
+```
+
+```{r}
+ufc_data$Date <- as.Date(ufc_data$Date, format = "%m/%d/%Y")
+
+ufc_data <- ufc_data[order(ufc_data$Date), ]
+
+sig_ts <- ts(na.omit(ufc_data$TotalSigStrikes.F1), frequency = 1)
+
+sig_ts
+```
+
+```{r}
+adf.test(sig_ts)
+```
+
+```{r}
+model <- auto.arima(sig_ts)
+summary(model)
+```
+
+```{r}
+future <- forecast(model, h = 10)
+plot(future)
+```
+
+```{r}
+checkresiduals(model)
+```
+
+```{r}
+# Total takedowns for Fighter 1
+takedowns_ts <- ts(ufc_data$TotalTakedowns.F1, frequency = 1)
+takedown_model <- auto.arima(takedowns_ts)
+forecast_takedown <- forecast(takedown_model, h = 10)
+plot(forecast_takedown)
+```
+
+```{r}
+accuracy(model)
+```
+
+# Summary of ARIMA
+## ME - Unpredicts by 3.6 Sig Strikes
+## RMSE - Large value indicates it sometimes makes large mistakes with a heavy penalty for outliers
+## MAE - Averages an error of 35 significant strikes per fight (this is can be extremely influential in fights)
+## MPE - Model is unpredicting outcomes
+## MAPE - Off by more than half the actual value (Very High)
+## MASE - Performs better than Naive
+##ACF1 - Mild autocorrelation
+### ARIMA model is better than a basic guess, but it has limited accuracy. It tends to underpredict, and it's often off by a large margin, especially in fights where the number of strikes is unusually high.
+
